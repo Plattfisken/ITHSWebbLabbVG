@@ -1,0 +1,58 @@
+﻿@page "/"
+
+@inject CartClass cartClass
+@inject DataAccess dataAccess
+@inject UserManager<ApplicationUser> userManager
+@inject AuthenticationStateProvider stateProvider
+
+@rendermode InteractiveServer
+@attribute [StreamRendering]
+
+<PageTitle>Shop</PageTitle>
+<h1>BUY!</h1>
+<CurrencyConverter OnChangedCurrency="ChangedCurrency" @ref="currencyConverter"/>
+@if(products is null) {
+    <p>Loading . . .</p>
+}
+else {
+    <div id="grid">
+        @foreach(var p in products) {
+            <ProductComponent Product="p" OnAddToCart="async () => AddToCart(p)" ExchangeRate="@ExchangeRate" DisplayedCurrency="@DisplayedCurrency"/>
+        }
+    </div>
+}
+@code {
+    CurrencyConverter currencyConverter;
+    float ExchangeRate{ get; set; } = 1;
+    string DisplayedCurrency{ get; set; } = "USD";
+    private void ChangedCurrency() {
+        ExchangeRate = currencyConverter.ExchangeRate;
+        DisplayedCurrency = currencyConverter.DisplayedCurrency;
+        StateHasChanged();
+    }
+    private List<Product>? products;
+    ApplicationUser? user;
+    AuthenticationState? authenticationState;
+    protected override async Task OnInitializedAsync() {
+        StateHasChanged();
+        await dataAccess.CreateExampleData();
+        authenticationState = await stateProvider.GetAuthenticationStateAsync();
+        user = await userManager.GetUserAsync(authenticationState.User);
+        products = await dataAccess.GetAllProducts();
+        if(user is not null) {
+            cartClass.ProductsInCart = await dataAccess.GetUserCart(user.Id);
+        }
+        StateHasChanged();
+    }
+    public async Task AddToCart(Product product) {
+        if(user is not null) {    
+            await dataAccess.AddToUserCart(user, product);
+            cartClass.ProductsInCart = await dataAccess.GetUserCart(user.Id);
+        }
+        else {
+            cartClass.ProductsInCart.Add(product);
+        //await localStorage.SetItemAsync<List<Product>>("Cart", cartClass.ProductsInCart); Behöver lägga till nugetpaketet
+        }
+        StateHasChanged();
+    }
+}

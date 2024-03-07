@@ -1,0 +1,98 @@
+@page "/cart"
+@inject CartClass cartClass
+@inject CustomerInfo customerInfo
+@inject NavigationManager navigationManager
+@inject DataAccess dataAccess
+@inject UserManager<ApplicationUser> userManager
+@inject AuthenticationStateProvider stateProvider
+@inject HttpClient httpClient
+
+@rendermode InteractiveServer
+@attribute [StreamRendering]
+
+<PageTitle>Cart</PageTitle>
+<h1>Cart</h1>
+<CurrencyConverter OnChangedCurrency="ChangedCurrency" @ref="currencyConverter"/>
+<button @onclick="ClearCart">Clear Cart</button>
+@foreach(var product in CurrentCart) {
+    <p>@product.Name  @(product.PriceInUsd * ExchangeRate) @DisplayedCurrency</p>
+}
+
+@if(TotalPrice > 0) {
+    <p>Total price: @(TotalPrice * ExchangeRate) @DisplayedCurrency</p>
+}
+@if(CurrentCart.Count > 0) {
+    <EditForm Model="CustomerInfoForm" OnSubmit="HandleSubmit" FormName="customerForm">
+        <label>First Name</label>
+        <InputText @bind-Value="CustomerInfoForm.FirstName">@CustomerInfoForm.FirstName</InputText>
+        
+        <label>Last Name</label>
+        <InputText @bind-Value="CustomerInfoForm.LastName">@CustomerInfoForm.LastName</InputText>
+
+        <label>Adress</label>
+        <InputText @bind-Value="CustomerInfoForm.Adress">@CustomerInfoForm.Adress</InputText>
+
+        <label>Email</label>
+        <InputText @bind-Value="CustomerInfoForm.Email">@CustomerInfoForm.Email</InputText>
+
+        <button type="submit">Submit</button>
+    </EditForm>
+}
+@code {
+    [SupplyParameterFromForm]
+    public CustomerInfo CustomerInfoForm { get; set; } = new CustomerInfo { FirstName = "", 
+                                                                            LastName = "",
+                                                                            Adress = "",
+                                                                            Email = "", };
+    List<Product> CurrentCart { get; set; } = [];
+    float TotalPrice { get; set; }
+    CurrencyConverter currencyConverter;
+    float ExchangeRate{ get; set; } = 1;
+    string DisplayedCurrency{ get; set; } = "USD";
+    public void ChangedCurrency() {
+        ExchangeRate = currencyConverter.ExchangeRate;
+        DisplayedCurrency = currencyConverter.DisplayedCurrency;
+        StateHasChanged();
+    }
+    private void CalculateTotalPrice() {
+        int result = 0;
+        foreach (var p in CurrentCart) {
+            result += p.PriceInUsd;
+        }
+        TotalPrice = result;
+    }
+    private void HandleSubmit() {
+        customerInfo.FirstName = CustomerInfoForm.FirstName;
+        customerInfo.LastName = CustomerInfoForm.LastName;
+        customerInfo.Adress = CustomerInfoForm.Adress;
+        customerInfo.Email = CustomerInfoForm.Email;       
+
+        if(user is not null){
+            navigationManager.NavigateTo($"/confirm/{user.Id}/{customerInfo.FirstName}/{customerInfo.LastName}/{customerInfo.Adress}/{customerInfo.Email}");
+        }
+        else{   
+            navigationManager.NavigateTo("account/login");
+        }
+    }
+    ApplicationUser? user;
+    AuthenticationState? authenticationState;
+    protected override async Task OnInitializedAsync() {
+        //var localStorageList = await localStorage.GetItemAsync<List<Product>>("Cart");
+        //if(localStorageList is not null) {
+        //    cartClass.ProductsInCart = localStorageList;
+        //}
+        authenticationState = await stateProvider.GetAuthenticationStateAsync();
+        user = await userManager.GetUserAsync(authenticationState.User);
+        CurrentCart = user != null ? await dataAccess.GetUserCart(user.Id) : cartClass.ProductsInCart; 
+        CalculateTotalPrice();
+    }
+    public async Task ClearCart() {
+        if(user is not null) {
+            dataAccess.ClearUserCart(user.Id);
+        }
+        cartClass.ProductsInCart.Clear();
+        CurrentCart.Clear();
+        CalculateTotalPrice();
+        StateHasChanged();
+    }
+}

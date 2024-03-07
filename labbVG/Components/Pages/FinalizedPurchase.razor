@@ -1,0 +1,12 @@
+@page "/finalized{userid}"
+@inject NavigationManager navigationManager
+@inject DataAccess dataAccess
+@inject CartClass cartClass
+@code {
+    [Parameter]
+    public string userId { get; set; }
+    protected override async Task OnInitializedAsync() {
+        await dataAccess.FinalizePurhcase(userId);
+        navigationManager.NavigateTo("/");
+    }
+}

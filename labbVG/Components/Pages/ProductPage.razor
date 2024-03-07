@@ -1,0 +1,73 @@
+@page "/products/{id:int}"
+@inject DataAccess dataAccess
+@inject CartClass cartClass
+@inject UserManager<ApplicationUser> userManager
+@inject AuthenticationStateProvider stateProvider
+@rendermode InteractiveServer
+@attribute [StreamRendering]
+
+<PageTitle>Product</PageTitle>
+<CurrencyConverter OnChangedCurrency="ChangedCurrency" @ref="currencyConverter"/>
+@if(loadingData) {
+    <p>Loading. . .</p>
+}
+else if(Product is null) {
+    <p>Product not found</p>
+}
+else {
+    <h1>@Product.Name</h1>
+    @Product.Description <br />
+    @if(productOutOfStock) {
+        <b style="background-color: red">OUT OF STOCK</b>   
+    }
+    else {
+        <p>Left in stock: <b>@(Product.QuantityInStock - cartClass.ProductsInCart.Count(p => p.Name == Product.Name))</b></p>
+    }
+    
+    <img src="@Product.ImageUrl" style="width: 500px; height: 500px;" />
+    <b>@(Product.PriceInUsd * ExchangeRate) @DisplayedCurrency</b>
+    <button disabled="@productOutOfStock" @onclick="AddToCart">Add to cart</button>
+}
+@code {
+    [Parameter]
+    public int Id { get; set; }
+    public Product? Product { get; set; }
+    ApplicationUser? user;
+    AuthenticationState? authenticationState;
+    CurrencyConverter currencyConverter;
+    float ExchangeRate{ get; set; } = 1;
+    string DisplayedCurrency{ get; set; } = "USD";
+    private void ChangedCurrency() {
+        ExchangeRate = currencyConverter.ExchangeRate;
+        DisplayedCurrency = currencyConverter.DisplayedCurrency;
+        StateHasChanged();
+    }
+    private bool loadingData = false;
+    private bool productOutOfStock;
+    protected override async Task OnInitializedAsync() {
+        StateHasChanged();
+        loadingData = true;
+        Product = await dataAccess.GetProduct(Id);
+        loadingData = false;
+        productOutOfStock = (Product.QuantityInStock - cartClass.ProductsInCart.Count(p => p.Name == Product.Name)) <= 0 ? true : false;
+        
+        authenticationState = await stateProvider.GetAuthenticationStateAsync();
+        user = await userManager.GetUserAsync(authenticationState.User);
+        if(user is not null) {
+            cartClass.ProductsInCart = await dataAccess.GetUserCart(user.Id);
+        }
+        StateHasChanged();
+    }
+    public async Task AddToCart() {
+        if(user is not null) {
+            await dataAccess.AddToUserCart(user, Product);
+            cartClass.ProductsInCart = await dataAccess.GetUserCart(user.Id);
+        }
+        else {
+            cartClass.ProductsInCart.Add(Product);    
+        //await localStorage.SetItemAsync<List<Product>>("Cart", cartClass.ProductsInCart);
+        }
+        productOutOfStock = (Product.QuantityInStock - cartClass.ProductsInCart.Count(p => p.Name == Product.Name)) <= 0 ? true : false;
+        StateHasChanged();
+    }
+}

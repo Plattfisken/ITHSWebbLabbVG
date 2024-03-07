@@ -1,0 +1,36 @@
+@inject NavigationManager navigationManager
+@inject CartClass cartClass
+<div>
+    <div @onclick="GoToProductPage">
+        <img src="@Product.ImageUrl" style="width: 100px; height: 100px;" />
+        <b>@Product.Name</b>
+        @if(productOutOfStock) {<br /><b style="background-color: red">OUT OF STOCK</b>}
+        <p>@(Product.PriceInUsd * ExchangeRate) @DisplayedCurrency</p>
+    </div>
+    <button disabled="@productOutOfStock" @onclick="AddToCart">Add to cart</button>
+</div>
+
+@code {
+    [Parameter]
+    public Product? Product { get; set; }
+    [Parameter]
+    public EventCallback OnAddToCart { get; set; }
+    [Parameter]
+    public float ExchangeRate { get; set; }
+    [Parameter]
+    public string DisplayedCurrency { get; set; } 
+
+    public async Task AddToCart() {
+        await OnAddToCart.InvokeAsync();
+        productOutOfStock = (Product.QuantityInStock - cartClass.ProductsInCart.Count(p => p.Name == Product.Name)) <= 0 ? true : false;
+        StateHasChanged();
+    }
+    public void GoToProductPage() {
+        navigationManager.NavigateTo($"/products/{Product.Id}");
+    }
+    private bool productOutOfStock;
+    protected override async Task OnInitializedAsync() {
+        productOutOfStock = (Product.QuantityInStock - cartClass.ProductsInCart.Count(p => p.Name == Product.Name)) <= 0 ? true : false;
+        StateHasChanged();
+    }
+}

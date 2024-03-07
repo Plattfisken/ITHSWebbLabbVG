@@ -1,0 +1,31 @@
+@inject HttpClient httpClient
+
+<select @bind="SelectedCurrency">
+    <option value="USD">USD</option>
+    <option value="EUR">EUR</option>
+    <option value="CNY">CNY</option>
+    <option value="DKK">DKK</option>
+    <option value="CHF">CHF</option>
+</select>
+<button @onclick="SelectCurrency">change</button>
+
+@code {
+    [Parameter]
+    public EventCallback OnChangedCurrency { get; set; }
+    string SelectedCurrency { get; set; } = "USD";
+    public float ExchangeRate { get; set; } = 1;
+    public string DisplayedCurrency { get; set; } = "USD";
+    async Task SelectCurrency() {
+        ExchangeRate = await GetExchangeRate();
+        DisplayedCurrency = SelectedCurrency;
+        OnChangedCurrency.InvokeAsync();
+    }
+    async Task<float> GetExchangeRate() {
+        string uri = $"https://api.api-ninjas.com/v1/exchangerate?pair=USD_{SelectedCurrency}&X-Api-Key=TmHSi9EwBbXUlnt5fUSQWQ==0M4ymXurHvpLcvig";
+        var response = await httpClient.GetFromJsonAsync<ExchangeRateClass>(uri);
+        return response.exchange_rate;
+    }     
+    public class ExchangeRateClass {
+        public float exchange_rate { get; set; }
+    } 
+}
