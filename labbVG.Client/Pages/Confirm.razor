@@ -1,0 +1,42 @@
+@page "/confirm/{userid}/{firstname}/{lastname}/{adress}/{email}"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@rendermode InteractiveAuto
+@inject IDataAccess dataAccess
+@inject NavigationManager navigationManager
+<PageTitle>Confirm</PageTitle>
+<h1>Confirm your purchase</h1>
+
+<AuthorizeView>
+    <p>
+        Hi @context.User.Identity?.Name! <br /> 
+        Please confirm that the following information is correct: <br />
+        Name: @FirstName @LastName<br /> 
+        Adress: @Adress<br />       
+        Email: @Email<br />       
+    </p>    
+    <b>Cart:</b><br />
+    @foreach(var p in cart) {
+        <p>@p.Name @p.PriceInUsd USD</p>        
+    }
+    <button @onclick="Confirmed">Confirm and purchase</button>
+</AuthorizeView>
+@code {
+    [Parameter]
+    public string UserId { get; set; }
+    [Parameter]
+    public string FirstName { get; set; }
+    [Parameter]
+    public string LastName { get; set; }
+    [Parameter]
+    public string Adress { get; set; }
+    [Parameter]
+    public string Email { get; set; }
+    List<Product> cart = [];
+    protected override async Task OnInitializedAsync() {
+        cart = await dataAccess.GetUserCart(UserId);
+    }
+    async Task Confirmed() {
+        navigationManager.NavigateTo($"/finalized{UserId}");
+    }
+}
